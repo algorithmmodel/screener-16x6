@@ -64,6 +64,7 @@
   .tab.pull.on{border-bottom-color:var(--gold);color:var(--gold);}
   .tab.cont.on{border-bottom-color:var(--green);color:var(--green);}
   .meta{font-size:clamp(12px,3.5vw,13px);color:var(--soft);font-weight:700;padding:6px 2px;}
+  .meta.warn{color:var(--gold);padding-top:0;}
   .meta b{color:var(--white);font-weight:800;}
   .meta b.now{color:var(--blue);}   /* mismo azul que el botón MERCADO */
 
@@ -97,6 +98,7 @@
   .id .tags{margin-top:3px;display:flex;gap:7px;flex-wrap:wrap;}
   .tag{font-size:clamp(12px,3.5vw,13px);font-weight:800;padding:1px 8px;border-radius:5px;
     border:2px solid var(--line);color:var(--soft);}
+  .tag.destacado{border-color:var(--blue);color:var(--blue);font-size:clamp(13px,3.5vw,14px);}
   .why{margin-top:9px;font-size:clamp(12px,3.8vw,14px);font-weight:800;color:var(--red);}
 
   /* Bloque de orden — áreas EXPLÍCITAS (nada de colocación automática).
@@ -147,6 +149,7 @@
   .met .m:first-child{border-left:none;}
   .met .k{font-size:clamp(10px,3.5vw,11px);color:var(--soft);font-weight:700;}
   .met .v{font-size:clamp(12px,5vw,14px);font-weight:800;margin-top:2px;}
+  .met .v.acuerdo{color:var(--gold);}
   .met .v.pos{color:var(--green);} .met .v.neg{color:var(--red);}
 
   /* ══════ iPad — dos filas: identidad arriba, orden y métricas abajo ══════ */
@@ -213,10 +216,11 @@
     </div>
   </div>
   <div class="tabs">
-    <button class="tab pull on" data-t="pull">PULLBACK<b id="nPull">0</b></button>
+    <button class="tab pull on" data-t="pull">RETROCESO<b id="nPull">0</b></button>
     <button class="tab cont" data-t="cont">IMPULSO<b id="nCont">0</b></button>
   </div>
   <div class="meta" id="meta"></div>
+  <div class="meta warn">⚠ sin filtro de beta — pueden entrar nombres con poco movimiento diario</div>
  </div>
 </header>
 
@@ -226,7 +230,7 @@
     Se aplican los filtros y se arman las dos listas.</div>
   <div id="cards" style="display:none">
     <section class="card pull on" id="cPull">
-      <div class="cardhead">Retroceso técnico dentro de tendencia alcista · ordenado por score</div>
+      <div class="cardhead">calidad en descuento · ordenado por score</div>
       <div class="rows" id="rPull"></div>
     </section>
     <section class="card cont" id="cCont">
@@ -245,11 +249,13 @@
 
 /* ════════ CONFIGURACIÓN ════════ */
 const WORKER_URL = "https://screener-16x6-api.omar-ora.workers.dev";
-const F = { precio:15, cap:2e8, beta:0.9, techCap:1e11 };
+const F = { precio:15, cap:2e8, techCap:1e11 };
 const TECH   = ["software","semiconductor","computer","internet","electronic","telecom","technology"];
 const BIO    = ["biotech","pharmac"];
 const CRIPTO = ["HUT","CIFR","RIOT","CORZ"];
-const PULL_MIN = -8, PULL_MAX = -0.5;   // rango de pullback vs EMA13
+const VETADOS = ["deteriora","downgrades","shorts","downward","hivol"];   // escenarios bajistas: vetan aunque también aparezca en uno alcista
+const MIN_ACUERDO = 5;                  // acuerdo de analistas mínimo (de 0 a 7)
+const PULL_MIN = -8, PULL_MAX = -0.5;   // rango de retroceso vs EMA13
 
 /* ════════ ESTADO ════════ */
 const S = { stocks:[], universo:[], vivo:{}, capturedAt:null, estabaEn:{}, ord:{} };
@@ -279,19 +285,35 @@ function cap(x){                                   // "1.684 B" → 1684000000
 }
 const g = (s,v,k) => ((s.views||{})[v]||{})[k];
 
-/* ════════ FILTROS DUROS ════════ */
-function pasa(s){
+/* ════════ FILTROS DUROS — cascada en 3 etapas ════════
+   1) pasaHard: filtro técnico genérico (precio, cap, sector, sin cripto).
+   2) pasaCalidad: + veto de escenario bajista + acuerdo mínimo de analistas.
+   3) pasa: + tendencia anual y EMA50 (dato de la matriz, no recalculado en vivo).
+   Se separan en 3 para poder mostrar cada conteo en el header (FILTRO HARD / CALIDAD). */
+function pasaHard(s){
   const p = num(g(s,"summary","Prior Close")),
         c = cap(g(s,"summary","Mkt Cap")),
-        b = num(g(s,"performance","Beta")),
         ind = String(g(s,"summary","Industry")||"").toLowerCase();
   if (p==null || p < F.precio) return false;
   if (c==null || c < F.cap)    return false;
-  if (b==null || b < F.beta)   return false;
   if (BIO.some(x=>ind.includes(x))) return false;
   if (s.sym.length===5 && "UWRYF".includes(s.sym.slice(-1))) return false;
   if (TECH.some(x=>ind.includes(x)) && c > F.techCap) return false;
   if (CRIPTO.includes(s.sym)) return false;
+  return true;
+}
+function pasaCalidad(s){
+  if (!pasaHard(s)) return false;
+  if ((s.lists||[]).some(l => VETADOS.includes(l))) return false;
+  if (acuerdo(s) < MIN_ACUERDO) return false;
+  return true;
+}
+function pasa(s){
+  if (!pasaCalidad(s)) return false;
+  const y52 = num(g(s,"technicals","Chg Last 52 Weeks"));
+  const e50 = num(g(s,"technicals","Vs. 50-Day EMA*"));
+  if (y52==null || y52<=0) return false;
+  if (e50==null || e50<=0) return false;
   return true;
 }
 
@@ -367,20 +389,18 @@ function pctRank(v){
 }
 function rankear(grupo, tipo){
   if (!grupo.length) return [];
-  const beta = grupo.map(x=> num(g(x.s,"performance","Beta")) ?? 0);
   const tend = grupo.map(x=> x.m.y52 ?? 0);
   const aire = grupo.map(x=> x.m.bhi ?? 0);
   const acu  = grupo.map(x=> x.acu);
   let comps, noms;
   if (tipo==="pull"){
-    const sh = grupo.map(x=> num(g(x.s,"technicals","Short Interest as % Float")) ?? 0);
     const pr = grupo.map(x=> -Math.abs(x.m.e13 + 3));          // óptimo en -3%
-    comps=[pctRank(beta),pctRank(tend),pctRank(pr),pctRank(aire),pctRank(sh),pctRank(acu)];
-    noms =["mov","tend","prof","aire","short","acuer"];
+    comps=[pctRank(tend),pctRank(pr),pctRank(aire),pctRank(acu)];
+    noms =["tend","prof","aire","acuer"];
   } else {
     const imp = grupo.map(x=> x.m.d5 ?? 0);
-    comps=[pctRank(beta),pctRank(tend),pctRank(imp),pctRank(aire.map(a=>-a)),pctRank(acu)];
-    noms =["mov","tend","imp","aire","acuer"];
+    comps=[pctRank(tend),pctRank(imp),pctRank(aire.map(a=>-a)),pctRank(acu)];
+    noms =["tend","imp","aire","acuer"];
   }
   grupo.forEach((x,i)=>{
     x.score = comps.reduce((t,c)=> t+c[i], 0)/comps.length;
@@ -421,10 +441,10 @@ const pc = n => n==null ? "—" : (n>=0?"+":"") + n.toFixed(2) + "%";
 function fila(x, tipo, rank, out){
   const s=x.s, m=x.m, o=x.o, hayMercado = !!S.vivo[s.sym];
   const co = g(s,"summary","Company Name") || "";
-  const tags = (s.lists||[]).slice(0,3).map(l=>`<span class="tag">${l}</span>`).join("");
+  const tags = (s.lists||[]).slice(0,3).map(l=>`<span class="tag destacado">${l}</span>`).join("");
   const met = tipo==="pull"
-    ? [["EMA13",pc(m.e13),m.e13>=0?"pos":"neg"],["EMA50",pc(m.e50),m.e50>=0?"pos":"neg"],["ANALISTAS",x.acu+"/7",""]]
-    : [["EMA13",pc(m.e13),m.e13>=0?"pos":"neg"],["5 DÍAS",pc(m.d5),(m.d5??0)>=0?"pos":"neg"],["ANALISTAS",x.acu+"/7",""]];
+    ? [["ANALISTAS",x.acu+"/7","acuerdo"],["EMA13",pc(m.e13),m.e13>=0?"pos":"neg"],["EMA50",pc(m.e50),m.e50>=0?"pos":"neg"]]
+    : [["ANALISTAS",x.acu+"/7","acuerdo"],["EMA13",pc(m.e13),m.e13>=0?"pos":"neg"],["5 DÍAS",pc(m.d5),(m.d5??0)>=0?"pos":"neg"]];
   return `<div class="row ${tipo==='pull'?'pull':''} ${out?'out':''}">
     <div class="rk">${out?"—":rank}</div>
     <div class="id">
@@ -473,7 +493,8 @@ function render(cards, fuera){
   const salieron = fuera.pull.length + fuera.cont.length;
   document.getElementById("meta").innerHTML =
     `MATRIZ <b>${S.stocks.length}</b>` +
-    ` · FILTRO HARD <b>${S.universo.length}</b>` +
+    ` · FILTRO HARD <b>${S.hardCount}</b>` +
+    ` · CALIDAD <b>${S.calidadCount}</b>` +
     ` · SETUP AHORA <b class="now">${setup}</b>` +
     (salieron ? ` · SALIERON <b>${salieron}</b>` : "");
 
@@ -519,6 +540,8 @@ async function restaurarSesion(){
 
     S.stocks = matriz.stocks;
     S.capturedAt = matriz.capturedAt;
+    S.hardCount = S.stocks.filter(pasaHard).length;
+    S.calidadCount = S.stocks.filter(pasaCalidad).length;
     S.universo = S.stocks.filter(pasa).map(s=>{ s._niv = niveles(s); return s; }).filter(s=>s._niv);
 
     // 2) después la sesión: solo se aplica si es de esta misma matriz
@@ -554,6 +577,8 @@ async function restaurarSesion(){
 function cargar(json, origen){
   S.stocks = json.stocks||[];
   S.capturedAt = json.capturedAt;
+  S.hardCount = S.stocks.filter(pasaHard).length;
+  S.calidadCount = S.stocks.filter(pasaCalidad).length;
   S.universo = S.stocks.filter(pasa).map(s=>{ s._niv = niveles(s); return s; }).filter(s=>s._niv);
   S.vivo = {}; S.estabaEn = {}; S.ord = {};
 
@@ -668,7 +693,7 @@ function exportPdfInterno(){
 
   let y = headerHeight + 26;
   const secciones = [
-    { tipo:"pull", titulo:"PULLBACK · Retroceso técnico dentro de tendencia alcista", lista:S.lastCards.pull, tercerCol:"EMA50" },
+    { tipo:"pull", titulo:"RETROCESO · calidad en descuento", lista:S.lastCards.pull, tercerCol:"EMA50" },
     { tipo:"cont", titulo:"IMPULSO · Momentum alcista sostenido", lista:S.lastCards.cont, tercerCol:"5 DÍAS" }
   ];
 
