@@ -666,7 +666,7 @@ function filasPdf(lista, tipo){
   return lista.map((x,i)=>{
     const s=x.s, m=x.m, o=x.o;
     const tercera = tipo==="pull" ? pc(m.e50) : pc(m.d5);
-    return [ i+1, s.sym, g(s,"summary","Company Name")||"", f2(o.buy), o.tp.toFixed(2),
+    return [ i+1, s.sym, g(s,"summary","Company Name")||"", f2(o.buy), pc(m.desp), o.tp.toFixed(2),
       f2(o.buy*(1+o.tp/100)), o.sl.toFixed(2), f2(o.buy*(1-o.sl/100)), pc(m.e13), tercera, x.acu+"/7" ];
   });
 }
@@ -728,14 +728,14 @@ function exportPdfInterno(){
     doc.autoTable({
       startY: y+8,
       margin:{ left:marginX, right:marginX },
-      head:[["#","Ticker","Empresa","BUY","TP%","SELL","SL%","STOP","EMA13", sec.tercerCol, "Analistas"]],
+      head:[["#","Ticker","Empresa","BUY","DESVÍO%","TP%","SELL","SL%","STOP","EMA13", sec.tercerCol, "Analistas"]],
       body: rows,
       theme:"grid",
       styles:{ font:"helvetica", fontSize:8.5, cellPadding:5, textColor:[44,44,42], lineColor:[211,209,199], lineWidth:0.5 },
       headStyles:{ fillColor:[241,239,232], textColor:[95,94,90], fontStyle:"bold", lineColor:[211,209,199] },
       columnStyles:{ 0:{cellWidth:20,textColor:[136,135,128]}, 1:{fontStyle:"bold"} },
       didParseCell:(cd)=>{
-        if (cd.section==="body" && (cd.column.index===8 || cd.column.index===9)){
+        if (cd.section==="body" && (cd.column.index===4 || cd.column.index===9 || cd.column.index===10)){
           const raw = rows[cd.row.index][cd.column.index];
           if (raw && raw!=="—"){
             const neg = raw.trim().startsWith("-");
