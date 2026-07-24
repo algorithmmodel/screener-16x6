@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
 <style>
   :root{
     --bg:#000; --panel:#12161C; --panel2:#1C222A; --line:#4A535E;
@@ -162,8 +164,8 @@
     .met{border-top:none;border-left:3px solid var(--line);align-self:stretch;
          grid-template-columns:repeat(3,minmax(84px,1fr));align-items:center;}
     .met .m{padding:10px 12px;}
-    .btnbox{flex:0 0 auto;} .btnbox button{width:auto;min-width:180px;}
-    .params{flex:1 1 auto;margin-left:auto;max-width:420px;}
+    .btnbox{flex:0 0 auto;} .btnbox button{width:auto;min-width:130px;padding:clamp(17px,3.4vw,18px) 16px;}
+    .params{flex:1 1 auto;margin-left:auto;max-width:360px;}
   }
 
   /* ══════ Mac / iPad apaisado — todo en una línea ══════ */
@@ -220,11 +222,11 @@
     Se aplican los filtros y se arman las dos listas.</div>
   <div id="cards" style="display:none">
     <section class="card pull on" id="cPull">
-      <div class="cardhead">rebote dentro de tendencia alcista · ordenado por score</div>
+      <div class="cardhead">Retroceso técnico dentro de tendencia alcista · ordenado por score</div>
       <div class="rows" id="rPull"></div>
     </section>
     <section class="card cont" id="cCont">
-      <div class="cardhead">sostiene la suba · ordenado por score</div>
+      <div class="cardhead">Momentum alcista sostenido · ordenado por score</div>
       <div class="rows" id="rCont"></div>
     </section>
   </div>
@@ -482,7 +484,9 @@ function render(cards, fuera){
    real de estado; los inputs usan un pequeño debounce para no mandar un
    POST por cada tecla. */
 function sessionPayload(){
-  return { capturedAt:S.capturedAt, stocks:S.stocks, vivo:S.vivo, ord:S.ord, estabaEn:S.estabaEn };
+  // liviano a propósito: la matriz completa vive en el KV, nunca se duplica acá
+  // (Firestore tiene un límite de 1MB por documento; la matriz cruda pesa varios MB)
+  return { capturedAt:S.capturedAt, vivo:S.vivo, ord:S.ord, estabaEn:S.estabaEn };
 }
 async function guardarSesion(){
   if (!WORKER_URL || !S.stocks.length) return;
@@ -503,28 +507,41 @@ function guardarSesionDebounced(){
 async function restaurarSesion(){
   if (!WORKER_URL) return;
   try {
-    const r = await fetch(WORKER_URL + "/session");
-    if (!r.ok) return;
-    const data = await r.json();
-    if (!data || !data.stocks || !data.stocks.length) return;
+    // 1) primero el KV: ¿hay matriz?
+    const rm = await fetch(WORKER_URL + "/matrix");
+    if (!rm.ok) return;
+    const matriz = await rm.json();
+    if (!matriz || !matriz.stocks || !matriz.stocks.length) return;
 
-    S.stocks = data.stocks;
-    S.capturedAt = data.capturedAt;
+    S.stocks = matriz.stocks;
+    S.capturedAt = matriz.capturedAt;
     S.universo = S.stocks.filter(pasa).map(s=>{ s._niv = niveles(s); return s; }).filter(s=>s._niv);
-    S.vivo = data.vivo || {};
-    S.ord = data.ord || {};
-    S.estabaEn = data.estabaEn || {};
+
+    // 2) después la sesión: solo se aplica si es de esta misma matriz
+    let origen = "matriz del Worker";
+    try {
+      const rs = await fetch(WORKER_URL + "/session");
+      if (rs.ok) {
+        const ses = await rs.json();
+        if (ses && ses.capturedAt === S.capturedAt) {
+          S.vivo = ses.vivo || {};
+          S.ord = ses.ord || {};
+          S.estabaEn = ses.estabaEn || {};
+          origen = "sesión restaurada";
+        }
+      }
+    } catch(e){ /* sin sesión, se sigue solo con la matriz */ }
 
     const cap = new Date(S.capturedAt), ahora = new Date();
     const hh = d => d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
     const viejo = cap.toDateString() !== ahora.toDateString();
     document.getElementById("sMatrix").innerHTML =
       `capturada <b class="${viejo?'warn':''}">${hh(cap)}${viejo?" · "+cap.toLocaleDateString()+" ⚠":""}</b><br>`+
-      `sesión restaurada · ${hh(ahora)}`;
+      `${origen} · ${hh(ahora)}`;
     document.getElementById("bMercado").disabled = false;
     document.getElementById("bPdf").disabled = false;
     procesar();
-  } catch(e){ /* sin sesión previa o Worker no responde: queda la pantalla inicial */ }
+  } catch(e){ /* Worker no responde: queda la pantalla inicial */ }
 }
 
 /* ════════ CARGA DE LA MATRIZ ════════
@@ -556,7 +573,7 @@ document.getElementById("bMatrix").addEventListener("click", async ()=>{
       cargar(await r.json(), "desde el Worker");
       return;
     }catch(e){
-      document.getElementById("sMatrix").innerHTML=`<span class="warn">Worker no responde: ${e.message}</span>`;
+      document.getElementById("sMatrix").innerHTML=`<span class="warn">Worker no responde (${e.message}) — elegí un archivo local como respaldo</span>`;
     }
   }
   document.getElementById("file").click();
@@ -647,8 +664,8 @@ function exportPdfInterno(){
 
   let y = headerHeight + 26;
   const secciones = [
-    { tipo:"pull", titulo:"PULLBACK · rebote dentro de tendencia alcista", lista:S.lastCards.pull, tercerCol:"EMA50" },
-    { tipo:"cont", titulo:"IMPULSO · sostiene la suba", lista:S.lastCards.cont, tercerCol:"5 DÍAS" }
+    { tipo:"pull", titulo:"PULLBACK · Retroceso técnico dentro de tendencia alcista", lista:S.lastCards.pull, tercerCol:"EMA50" },
+    { tipo:"cont", titulo:"IMPULSO · Momentum alcista sostenido", lista:S.lastCards.cont, tercerCol:"5 DÍAS" }
   ];
 
   secciones.forEach(sec=>{
