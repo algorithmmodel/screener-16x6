@@ -605,7 +605,23 @@ function filasPdf(lista, tipo){
   });
 }
 function exportPdf(){
-  if (!S.lastCards || (!S.lastCards.pull.length && !S.lastCards.cont.length)) return;
+  const sPdf = document.getElementById("sPdf");
+  if (!S.lastCards || (!S.lastCards.pull.length && !S.lastCards.cont.length)){
+    sPdf.innerHTML = `<span class="warn">no hay tickers para exportar</span>`;
+    return;
+  }
+  if (!window.jspdf){
+    sPdf.innerHTML = `<span class="warn">no cargó la librería de PDF (revisá tu conexión o un bloqueador de anuncios)</span>`;
+    return;
+  }
+  try{
+    exportPdfInterno();
+    sPdf.innerHTML = `generado <b>${new Date().toLocaleTimeString()}</b>`;
+  }catch(e){
+    sPdf.innerHTML = `<span class="warn">error al generar: ${e.message}</span>`;
+  }
+}
+function exportPdfInterno(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:"pt", format:"letter" });
   const marginX = 40;
@@ -668,7 +684,6 @@ function exportPdf(){
 
   const stamp = new Date().toISOString().replace(/[:T]/g,"-").slice(0,16);
   doc.save(`Screener_16x6_${stamp}.pdf`);
-  document.getElementById("sPdf").innerHTML = `generado <b>${new Date().toLocaleTimeString()}</b>`;
 }
 document.getElementById("bPdf").addEventListener("click", exportPdf);
 
