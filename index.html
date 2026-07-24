@@ -543,6 +543,7 @@ function cargar(json, origen){
     `capturada <b class="${viejo?'warn':''}">${hh(cap)}${viejo?" · "+cap.toLocaleDateString()+" ⚠":""}</b><br>`+
     `cargada <b>${hh(ahora)}</b> · ${origen}`;
   document.getElementById("bMercado").disabled = false;
+  document.getElementById("bPdf").disabled = false;
   procesar();
   guardarSesion();
 }
