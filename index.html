@@ -28,17 +28,17 @@
 
   /* ══════ HEADER ══════ */
   header{border-bottom:3px solid var(--line);background:#000;position:sticky;top:0;z-index:30;
-    padding:calc(env(safe-area-inset-top) + 9px) max(12px,env(safe-area-inset-left)) 0
+    padding:calc(env(safe-area-inset-top) + 6px) max(12px,env(safe-area-inset-left)) 0
             max(12px,env(safe-area-inset-right));}
   .hwrap{max-width:1400px;margin:0 auto;}
-  .brand{font-size:clamp(17px,5vw,23px);font-weight:800;letter-spacing:.02em;margin-bottom:14px;}
+  .brand{font-size:clamp(17px,5vw,23px);font-weight:800;letter-spacing:.02em;margin-bottom:8px;}
   .brand i{color:var(--gold);font-style:normal;}
 
   .bar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;}
   .btnbox{display:flex;flex-direction:column;gap:7px;flex:1 1 46%;}
-  .btnbox button{border:none;border-radius:9px;padding:clamp(14px,3.4vw,15px) 19px;
+  .btnbox button{border:none;border-radius:9px;padding:clamp(9px,3.4vw,10px) 19px;
     font-family:inherit;font-size:clamp(13px,4.2vw,16px);font-weight:800;letter-spacing:.05em;
-    cursor:pointer;width:100%;min-height:48px;}
+    cursor:pointer;width:100%;min-height:36px;}
   #bMatrix{background:var(--green);color:#000;}
   #bMercado{background:var(--blue);color:#000;}
   #bPdf{background:var(--gold);color:#000;}
@@ -55,15 +55,15 @@
     font-size:clamp(21px,6vw,27px);font-weight:800;width:100%;padding:0;outline:none;}
   .p.sl input{color:var(--red);}
 
-  .tabs{display:flex;margin-top:16px;}
+  .tabs{display:flex;margin-top:8px;}
   .tab{flex:1;background:none;border:none;border-bottom:5px solid var(--line);
-    padding:12px 6px 10px;font-family:inherit;font-size:clamp(12px,3.9vw,16px);
+    padding:7px 6px 6px;font-family:inherit;font-size:clamp(12px,3.9vw,16px);
     font-weight:800;color:var(--soft);cursor:pointer;letter-spacing:.03em;
-    text-align:center;min-height:50px;}
+    text-align:center;min-height:36px;}
   .tab b{font-size:clamp(18px,5.4vw,23px);margin-left:9px;font-weight:800;}
   .tab.pull.on{border-bottom-color:var(--gold);color:var(--gold);}
   .tab.cont.on{border-bottom-color:var(--green);color:var(--green);}
-  .meta{font-size:clamp(12px,3.5vw,13px);color:var(--soft);font-weight:700;padding:12px 2px;}
+  .meta{font-size:clamp(12px,3.5vw,13px);color:var(--soft);font-weight:700;padding:6px 2px;}
   .meta b{color:var(--white);font-weight:800;}
   .meta b.now{color:var(--blue);}   /* mismo azul que el botón MERCADO */
 
@@ -80,14 +80,14 @@
   .cardhead{font-size:clamp(12px,3.6vw,14px);font-weight:700;color:var(--soft);margin:0 2px 16px;}
 
   /* ══════ FILA — base: iPhone (apilada) ══════ */
-  .rows{display:flex;flex-direction:column;gap:11px;}
+  .rows{display:flex;flex-direction:column;gap:7px;}
   .row{background:var(--panel);border:3px solid var(--line);border-left:7px solid var(--green);
     border-radius:10px;overflow:hidden;display:grid;grid-template-columns:1fr;}
   .row.pull{border-left-color:var(--gold);}
   .row.out{opacity:.55;border-left-color:var(--soft);background:#0C0F13;}
   .rk{grid-area:rk;font-size:clamp(14px,4.4vw,17px);font-weight:800;color:var(--soft);
       padding:11px 16px;background:var(--panel2);border-bottom:3px solid var(--line);}
-  .id{grid-area:id;padding:16px 17px 0;}
+  .id{grid-area:id;padding:8px 17px 0;}
   .ord{grid-area:ord;}
   .met{grid-area:met;}
 
@@ -101,9 +101,9 @@
 
   /* Bloque de orden — áreas EXPLÍCITAS (nada de colocación automática).
      iPhone: BUY ocupa todo el ancho; TP/SL y SELL/STOP comparten línea. */
-  .ord{display:grid;padding:18px 17px;font-variant-numeric:tabular-nums;
+  .ord{display:grid;padding:10px 17px;font-variant-numeric:tabular-nums;
        grid-template-columns:52px minmax(76px,86px) 56px minmax(0,1fr);
-       gap:9px 8px;align-items:center;
+       gap:5px 8px;align-items:center;
        grid-template-areas:
          "kbuy  dv    dv     dv"
          "vbuy  vbuy  vbuy   vbuy"
@@ -128,8 +128,8 @@
   .dv .rl i.dn{background:var(--red);}
 
   .f{background:#080A0E;border:3px solid var(--line);border-radius:8px;color:var(--white);
-     font-family:inherit;font-weight:800;padding:7px 10px;outline:none;text-align:right;
-     min-height:48px;width:100%;}
+     font-family:inherit;font-weight:800;padding:4px 8px;outline:none;text-align:right;
+     min-height:32px;width:100%;}
   .f:focus{border-color:var(--gold);background:var(--panel2);box-shadow:0 0 0 4px rgba(255,196,0,.25);}
   .f.money{font-size:clamp(20px,6.2vw,25px);}
   .f.pct{font-size:clamp(16px,4.8vw,19px);color:var(--gold);}
@@ -153,8 +153,8 @@
          align-items:center;gap:0;}
     .rk{background:none;border-bottom:none;border-right:3px solid var(--line);
         display:flex;align-items:center;justify-content:center;height:100%;padding:0;}
-    .id{padding:16px 18px 6px;}
-    .ord{padding:12px 18px 18px;gap:10px;
+    .id{padding:8px 18px 4px;}
+    .ord{padding:6px 18px 10px;gap:6px;
          grid-template-columns:auto minmax(84px,96px) 20px auto minmax(150px,190px);
          grid-template-areas:
            "kbuy dv   dv  dv    vbuy"
@@ -172,8 +172,8 @@
   @media(min-width:1100px){
     .row{grid-template-columns:60px minmax(180px,1fr) auto minmax(250px,auto);
          grid-template-areas:"rk id ord met";}
-    .id{padding:16px 18px;}
-    .ord{padding:16px 18px;gap:10px;
+    .id{padding:8px 18px;}
+    .ord{padding:8px 18px;gap:6px;
          grid-template-columns:auto 92px 20px auto 160px;
          grid-template-areas:
            "kbuy dv   dv  dv    vbuy"
