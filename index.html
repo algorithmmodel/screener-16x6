@@ -39,6 +39,7 @@
     cursor:pointer;width:100%;min-height:56px;}
   #bMatrix{background:var(--green);color:#000;}
   #bMercado{background:var(--blue);color:#000;}
+  #bPdf{background:var(--gold);color:#000;}
   .btnbox button:disabled{opacity:.45;cursor:default;}
   .stamp{font-size:clamp(17px,3.6vw,18px);color:var(--soft);font-weight:700;line-height:1.6;}
   .stamp b{color:var(--white);font-weight:800;}
@@ -196,6 +197,10 @@
       <button id="bMercado" disabled>MERCADO</button>
       <div class="stamp" id="sMercado">—</div>
     </div>
+    <div class="btnbox">
+      <button id="bPdf" disabled>GENERAR PDF</button>
+      <div class="stamp" id="sPdf">—</div>
+    </div>
     <div class="params">
       <div class="p"><label>TP % — a todos</label><input id="tp" type="number" step="0.1" value="1.5"></div>
       <div class="p sl"><label>STOP % — a todos</label><input id="sl" type="number" step="0.1" value="1.0"></div>
@@ -227,6 +232,8 @@
 
 <input type="file" id="file" accept=".json" style="display:none">
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 <script>
 "use strict";
 
@@ -444,6 +451,7 @@ function fila(x, tipo, rank, out){
 }
 
 function render(cards, fuera){
+  S.lastCards = cards;   // ← lo usa exportPdf() para tomar exactamente lo que está en pantalla ahora
   document.getElementById("msg").style.display="none";
   document.getElementById("cards").style.display="block";
   const pintar=(id,lista,salidos,tipo)=>{
@@ -514,6 +522,7 @@ async function restaurarSesion(){
       `capturada <b class="${viejo?'warn':''}">${hh(cap)}${viejo?" · "+cap.toLocaleDateString()+" ⚠":""}</b><br>`+
       `sesión restaurada · ${hh(ahora)}`;
     document.getElementById("bMercado").disabled = false;
+    document.getElementById("bPdf").disabled = false;
     procesar();
   } catch(e){ /* sin sesión previa o Worker no responde: queda la pantalla inicial */ }
 }
@@ -579,6 +588,88 @@ document.getElementById("bMercado").addEventListener("click", async ()=>{
     guardarSesion();
   }catch(e){ st.innerHTML=`<span class="warn">error: ${e.message}</span>`; }
 });
+
+/* ════════ GENERAR PDF ════════
+   Header negro (título + fechas + setup) y una tabla por sección con
+   jsPDF-AutoTable, que mide cada fila antes de dibujarla: si no entra
+   completa en lo que queda de la página, la manda entera a la siguiente
+   (nunca corta un ticker a la mitad). Solo entran los tickers activos
+   ahora mismo en pantalla (S.lastCards), no los que ya "salieron". */
+function filasPdf(lista, tipo){
+  return lista.map((x,i)=>{
+    const s=x.s, m=x.m, o=x.o;
+    const tercera = tipo==="pull" ? pc(m.e50) : pc(m.d5);
+    return [ i+1, s.sym, g(s,"summary","Company Name")||"", f2(o.buy), o.tp.toFixed(2),
+      f2(o.buy*(1+o.tp/100)), o.sl.toFixed(2), f2(o.buy*(1-o.sl/100)), pc(m.e13), tercera, x.acu+"/7" ];
+  });
+}
+function exportPdf(){
+  if (!S.lastCards || (!S.lastCards.pull.length && !S.lastCards.cont.length)) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"letter" });
+  const marginX = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const hh = d => d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+
+  const headerHeight = 66;
+  doc.setFillColor(10,10,10);
+  doc.rect(0,0,pageWidth,headerHeight,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(18);
+  doc.setTextColor(255,196,0);
+  doc.text("SCREENER · 16×6", marginX, 30);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9);
+  doc.setTextColor(183,192,204);
+  const cap = S.capturedAt ? new Date(S.capturedAt) : null;
+  doc.text(`capturada ${cap?hh(cap):"—"} · generado ${hh(new Date())}`, marginX, 48);
+
+  const setup = S.lastCards.pull.length + S.lastCards.cont.length;
+  doc.setFont("helvetica","bold"); doc.setFontSize(11);
+  doc.setTextColor(0,230,118);
+  doc.text(`SETUP AHORA: ${setup}`, pageWidth-marginX, 30, {align:"right"});
+
+  let y = headerHeight + 26;
+  const secciones = [
+    { tipo:"pull", titulo:"PULLBACK · rebote dentro de tendencia alcista", lista:S.lastCards.pull, tercerCol:"EMA50" },
+    { tipo:"cont", titulo:"IMPULSO · sostiene la suba", lista:S.lastCards.cont, tercerCol:"5 DÍAS" }
+  ];
+
+  secciones.forEach(sec=>{
+    if (!sec.lista.length) return;
+    if (y > pageHeight - 100){ doc.addPage(); y = 40; }
+    doc.setFont("helvetica","bold"); doc.setFontSize(11);
+    doc.setTextColor(20,20,20);
+    doc.text(sec.titulo, marginX, y);
+
+    const rows = filasPdf(sec.lista, sec.tipo);
+    doc.autoTable({
+      startY: y+8,
+      margin:{ left:marginX, right:marginX },
+      head:[["#","Ticker","Empresa","BUY","TP%","SELL","SL%","STOP","EMA13", sec.tercerCol, "Analistas"]],
+      body: rows,
+      theme:"grid",
+      styles:{ font:"helvetica", fontSize:8.5, cellPadding:5, textColor:[44,44,42], lineColor:[211,209,199], lineWidth:0.5 },
+      headStyles:{ fillColor:[241,239,232], textColor:[95,94,90], fontStyle:"bold", lineColor:[211,209,199] },
+      columnStyles:{ 0:{cellWidth:20,textColor:[136,135,128]}, 1:{fontStyle:"bold"} },
+      didParseCell:(cd)=>{
+        if (cd.section==="body" && (cd.column.index===8 || cd.column.index===9)){
+          const raw = rows[cd.row.index][cd.column.index];
+          if (raw && raw!=="—"){
+            const neg = raw.trim().startsWith("-");
+            cd.cell.styles.textColor = neg ? [163,45,45] : [59,109,17];
+            cd.cell.styles.fontStyle = "bold";
+          }
+        }
+      }
+    });
+    y = doc.lastAutoTable.finalY + 20;
+  });
+
+  const stamp = new Date().toISOString().replace(/[:T]/g,"-").slice(0,16);
+  doc.save(`Screener_16x6_${stamp}.pdf`);
+  document.getElementById("sPdf").innerHTML = `generado <b>${new Date().toLocaleTimeString()}</b>`;
+}
+document.getElementById("bPdf").addEventListener("click", exportPdf);
 
 /* ════════ EDICIÓN POR TICKER ════════
    Cualquiera de los cinco campos se puede escribir a mano.
