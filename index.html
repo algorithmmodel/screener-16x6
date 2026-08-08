@@ -531,7 +531,9 @@ function render(cards, fuera){
 function sessionPayload(){
   // liviano a propósito: la matriz completa vive en el KV, nunca se duplica acá
   // (Firestore tiene un límite de 1MB por documento; la matriz cruda pesa varios MB)
-  return { capturedAt:S.capturedAt, vivo:S.vivo, ord:S.ord, estabaEn:S.estabaEn };
+  // capturedAt: a qué matriz pertenece (para el matching). guardadoAt: cuándo se
+  // guardó ESTA sesión de verdad — son cosas distintas, no confundir una con otra.
+  return { capturedAt:S.capturedAt, guardadoAt:new Date().toISOString(), vivo:S.vivo, ord:S.ord, estabaEn:S.estabaEn };
 }
 async function guardarSesion(){
   if (!WORKER_URL || !S.stocks.length) return;
@@ -566,6 +568,7 @@ async function restaurarSesion(){
 
     // 2) después la sesión: solo se aplica si es de esta misma matriz
     let origen = "matriz del Worker";
+    let guardadoAt = null;
     try {
       const rs = await fetch(WORKER_URL + "/session");
       if (rs.ok) {
@@ -575,6 +578,7 @@ async function restaurarSesion(){
           S.ord = ses.ord || {};
           S.estabaEn = ses.estabaEn || {};
           origen = "sesión restaurada";
+          guardadoAt = ses.guardadoAt || null;
         }
       }
     } catch(e){ /* sin sesión, se sigue solo con la matriz */ }
@@ -582,9 +586,12 @@ async function restaurarSesion(){
     const cap = new Date(S.capturedAt), ahora = new Date();
     const hh = d => d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
     const viejo = cap.toDateString() !== ahora.toDateString();
+    // si la sesión trae guardadoAt (hora real de guardado), se muestra esa —
+    // si es una sesión vieja sin ese campo, se aclara que no se sabe cuándo se guardó
+    const sesionTxt = guardadoAt ? `guardada ${hh(new Date(guardadoAt))}` : (origen==="sesión restaurada" ? "guardada (fecha desconocida)" : origen);
     document.getElementById("sMatrix").innerHTML =
       `capturada <b class="${viejo?'warn':''}">${hh(cap)}${viejo?" · "+cap.toLocaleDateString()+" ⚠":""}</b><br>`+
-      `${origen} · ${hh(ahora)}`;
+      `${sesionTxt} · vista ${hh(ahora)}`;
     document.getElementById("bMercado").disabled = false;
     document.getElementById("bPdf").disabled = false;
     procesar();
